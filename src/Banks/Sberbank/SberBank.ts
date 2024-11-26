@@ -3,7 +3,6 @@ import { Console } from '../../Utils/Console.js';
 import { firefox, type Browser, type Locator, type Page, type Response } from '@playwright/test'
 // import * as fs from 'fs';
 import { parse } from 'node-html-parser';
-import { couldStartTrivia } from 'typescript';
 
 // // import procedure from '../../procedure/' assert { type: 'json' };
 
