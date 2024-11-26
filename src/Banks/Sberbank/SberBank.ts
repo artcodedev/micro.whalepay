@@ -1,10 +1,8 @@
 
-import { Console } from '../../Utils/Console.js';
-import { firefox, type Browser, type Locator, type Page, type Response } from '@playwright/test'
+import { Console } from '../../Utils/Console';
+import { firefox, type Browser, type Locator, type Page} from '@playwright/test'
 // import * as fs from 'fs';
 import { parse } from 'node-html-parser';
-
-// // import procedure from '../../procedure/' assert { type: 'json' };
 
 /*
 *** use proxy
@@ -70,12 +68,18 @@ export class SberBank {
         this.url = 'https://online.sberbank.ru/CSAFront/index.do';
     }
 
+    /*
+    *** Time sleep (delay)(miliseconds)
+    */
     private async delay(time: number): Promise<void> {
         return new Promise(function (resolve) {
             setTimeout(resolve, time)
         });
     }
 
+    /*
+    *** Parse HTML
+    */
     private async parseHTML(html: string): Promise<parseHTMLResponse> {
 
         try {
@@ -121,6 +125,9 @@ export class SberBank {
 
     }
 
+    /*
+    *** Close browser
+    */
     private async close(): Promise<void> {
         try {
 
@@ -132,6 +139,9 @@ export class SberBank {
         }
     }
 
+    /*
+    *** All megic here :)
+    */
     private async start(): Promise<ResponseService> {
 
         try {
