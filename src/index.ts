@@ -36,8 +36,6 @@ app.get('/daemon', (c) => {
   return c.json({ page: 'payments' });
 });
 
-export default app;
-
 const port = 3002;
 
 Console.log(`Server is running on http://localhost:${port}`);
@@ -46,3 +44,6 @@ serve({
   fetch: app.fetch,
   port
 });
+
+
+export default app;
