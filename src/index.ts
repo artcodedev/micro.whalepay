@@ -34,6 +34,7 @@ interface SberBank_RUB {
   timeout: number
   trx: string
   token: string
+  session_uid: string
 }
 
 const app = new Hono();
