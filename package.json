@@ -1,13 +1,20 @@
 {
   "name": "micro.whalepay",
   "scripts": {
-    "start": "bun run --hot src/index.ts"
+    "start": "bun run --hot src/index.ts",
+    "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "@playwright/test": "^1.49.0",
     "hono": "^4.6.12",
-    "node-html-parser": "^6.1.13"
+    "jsonwebtoken": "^9.0.2",
+    "node-html-parser": "^6.1.13",
+    "@types/bcrypt": "^5.0.2",
+    "@types/fs-extra": "^11.0.4",
+    "@types/jsonwebtoken": "^9.0.7",
+    "dotenv": "^16.4.5",
+    "fs-extra": "^11.2.0"
   },
   "devDependencies": {
     "@types/bun": "latest"
