@@ -15,7 +15,11 @@ import { SberBank } from './Banks/Sberbank/SberBank';
 /*
 *** Tokens
 */
-import { Token } from './Token';
+
+import { Token } from './Utils/Token';
+
+import { SecretKey } from './Secure/SeckretKey';
+// import { Token } from './Token';
 
 
 
@@ -55,11 +59,17 @@ app.post('/micro/payments/sberbank_rub', async (c) => {
 
   const req: SberBank_RUB = await c.req.json();
 
+  console.log(req);
 
   if (req.token) {
-    const token: boolean = await Token.VarifyToket(req.token);
+
+    const token: boolean = await Token.verify(req.token, SecretKey.secret_key_micro);
+
+    console.log(`Token ${token}`)
 
     if (token) {
+
+      console.log("start micro")
 
       let s = new SberBank(req.login, req.password, req.trx, req.amount, req.timeout, req.proxy);
 
@@ -69,7 +79,7 @@ app.post('/micro/payments/sberbank_rub', async (c) => {
 
     }
 
-    return c.json({status: 505, message: "token in incorrect"});
+    return c.json({status: 500, message: "token in incorrect"});
   }
 
   return c.json({status: 400, message: "token not found"});

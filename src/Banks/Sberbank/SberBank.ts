@@ -44,7 +44,8 @@ enum Error {
     PARSE,
     TIMEEND,
     SESSIONERROR,
-    OTHER
+    OTHER,
+    REQVER
 }
 
 export class SberBank {
@@ -373,6 +374,10 @@ export class SberBank {
 
                     case Error.SESSIONERROR:
                         Console.error('[+] Error.SESSIONERROR')
+                        //some do
+                        break
+                    case Error.REQVER:
+                        Console.error('[+] Error.REQVER')
                         //some do
                         break
                 }
