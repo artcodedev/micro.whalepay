@@ -1,8 +1,11 @@
 
 import { Console } from '../../Utils/Console';
-import { firefox, type Browser, type Locator, type Page} from '@playwright/test'
+import { firefox, type Browser, type Locator, type Page } from '@playwright/test'
 // import * as fs from 'fs';
 import { parse } from 'node-html-parser';
+import { Token } from '../../Utils/Token';
+import { SecretKey } from '../../Secure/SeckretKey';
+import { Fetch } from '../../Utils/Fetch';
 
 /*
 *** use proxy
@@ -10,7 +13,7 @@ import { parse } from 'node-html-parser';
 
 interface Data {
     uohId: string | null
-    amount: string | null
+    amount: number | null
 }
 
 interface ResponseService {
@@ -36,37 +39,87 @@ interface Proxy {
     port: string
 }
 
-enum Error {
-    PROXY,
-    LOGIN,
-    NETWORK,
-    NOTFOUNDELEM,
-    PARSE,
-    TIMEEND,
-    SESSIONERROR,
-    OTHER,
-    REQVER
+interface Response {
+    status: number
+    error: Error | null
+    trx: string
+    session_uid: string
+    token: string
+    amount: number
 }
+
+enum Error {
+    PROXY = "PROXY",
+    LOGIN = "LOGIN",
+    NETWORK = "NETWORK",
+    NOTFOUNDELEM = "NOTFOUNDELEM",
+    PARSE = "PARSE",
+    TIMEEND = "TIMEEND",
+    SESSIONERROR = "SESSIONERROR",
+    OTHER = "OTHER",
+    REQVER = "REQVER"
+}
+
 
 export class SberBank {
 
     private login: string;
     private pass: string
-    private amount: string;
+    private amount: number;
     private timeEnd: number;
     private proxy: Proxy;
     private url: string;
     private uohId: string;
     private browser: Browser | undefined;
+    private session_uid: string;
 
-    constructor(login: string, pass: string, uohId: string, amount: string, timeEnd: number, proxy: Proxy) {
+    /*
+    *** Count errors
+    */
+    private Error_OTHER: number = 0;
+    private Error_LOGIN: number = 0;
+    private Error_PROXY: number = 0;
+    private Error_NETWORK: number = 0;
+    private Error_NOTFOUNDELEM: number = 0;
+    private Error_PARSE: number = 0;
+    private Error_TIMEEND: number = 0;
+    private Error_SESSIONERROR: number = 0;
+    private Error_REQVER: number = 0;
+
+    /*
+    *** Constructor
+    */
+    constructor(login: string, pass: string, uohId: string, amount: number, timeEnd: number, proxy: Proxy, session_uid: string) {
         this.login = login;
         this.pass = pass;
         this.amount = amount;
         this.timeEnd = timeEnd;
         this.proxy = proxy;
         this.uohId = uohId;
+        this.session_uid = session_uid;
         this.url = 'https://online.sberbank.ru/CSAFront/index.do';
+    }
+
+    /*
+    *** Response answer when programm is done
+    */
+    private async response(uohId: string | null, amount: number, error: Error | null) {
+
+        const token: string = await Token.sign({ session_uid: this.session_uid }, SecretKey.secret_key_micro, 60000);
+
+        const data: Response = {
+            status: error ? 500 : 200,
+            error: error ? error : null,
+            trx: uohId ? uohId : this.uohId,
+            session_uid: this.session_uid,
+            token: token,
+            amount: amount
+        }
+
+        console.log("REAPONSE")
+        console.log(data)
+
+        process.exit(1);
     }
 
     /*
@@ -76,6 +129,13 @@ export class SberBank {
         return new Promise(function (resolve) {
             setTimeout(resolve, time)
         });
+    }
+
+    /*
+    *** Get date now (moskow)
+    */
+    private async dateNow(): Promise<number> {
+        return Date.parse(new Date().toLocaleString("en-US", { timeZone: "Europe/Moscow" }));
     }
 
     /*
@@ -109,7 +169,7 @@ export class SberBank {
                             if (num.includes(i)) amount += i;
                         }
 
-                        if (this.amount === amount && this.uohId !== uohId) {
+                        if (String(this.amount) === amount && this.uohId !== uohId) {
                             return { status: true, data: { amount: amount, uohId: uohIdp } }
                         }
 
@@ -249,7 +309,7 @@ export class SberBank {
 
             await this.delay(5000);
 
-            while (Date.now() < this.timeEnd) {
+            while (await this.dateNow() < this.timeEnd) {
 
                 await page.reload();
                 await this.delay(5000)
@@ -274,14 +334,20 @@ export class SberBank {
 
                     console.log(status)
 
-                    let amount: string | undefined = parseHTML.data?.amount;
+                    let amount: number | undefined = Number(parseHTML.data?.amount);
                     let uohId: string | undefined = parseHTML.data?.uohId;
+
+
+                    /* CHANGE  GET UOHID 222222  */
 
                     if (amount != undefined && uohId != undefined) {
 
-                        await this.close()
+                        if (amount == this.amount && uohId != this.uohId) {
 
-                        return { status: true, data: { uohId: uohId, amount: amount } }
+                            await this.close()
+
+                            return { status: true, data: { uohId: uohId, amount: amount } }
+                        }
 
                     }
                 }
@@ -296,7 +362,8 @@ export class SberBank {
             }
 
             await this.browser.close()
-            return { status: false, type: Date.now() > this.timeEnd ? Error.TIMEEND : Error.OTHER }
+
+            return { status: false, type: await this.dateNow() > this.timeEnd ? Error.TIMEEND : Error.OTHER }
 
         }
         catch (e) {
@@ -309,6 +376,9 @@ export class SberBank {
 
     }
 
+    /*
+    *** Start app and check errors
+    */
     public async payment(): Promise<void> {
 
         /*
@@ -316,13 +386,21 @@ export class SberBank {
         отправляем запрос на сервер в зависимости о ответа ОШИБКА или НЕТ а так же изменение ПРОКСИ 
         */
 
-        while (Date.now() < this.timeEnd) {
+        while (await this.dateNow() < this.timeEnd) {
 
             const start: ResponseService = await this.start();
 
             if (start.status) {
+
                 Console.ok(start.data)
-                
+
+                const uohId: string | null |  undefined = start.data?.uohId;
+                const amount: number | null | undefined = start.data?.amount;
+
+                if (uohId && amount) {
+                    await this.response(uohId, amount, this.uohId === '' ? Error.REQVER : null)
+                }
+
                 return
             }
 
@@ -330,36 +408,50 @@ export class SberBank {
                 /* 
                 Обработка ошибки
                 */
-               Console.error("[+] Status false")
+                Console.error("[+] Status false")
 
                 switch (start.type) {
 
                     case Error.OTHER:
                         Console.error('[+] Error.OTHER')
-                        /* 
-                        *** some do
-                        *** if (error > a) { fetch } 
-                        */
+
+                        if (this.Error_OTHER > 5) {
+                            await this.response(null, this.amount, Error.OTHER)
+                        }
+                        this.Error_OTHER++;
                         break
 
                     case Error.LOGIN:
                         Console.error('[+] Error.LOGIN')
-                        //some do
+
+                        if (this.Error_LOGIN > 3) {
+                            await this.response(null, this.amount, Error.LOGIN);
+                        }
+                        this.Error_LOGIN++;
                         break
 
                     case Error.NETWORK:
                         Console.error('[+] Error.NETWORK')
-                        //some do
+                        if (this.Error_NETWORK > 5) {
+                            await this.response(null, this.amount, Error.NETWORK);
+                        }
+                        this.Error_NETWORK++;
                         break
 
                     case Error.NOTFOUNDELEM:
                         Console.error('[+] Error.NOTFOUNDELEM')
-                        //some do
+                        if (this.Error_NOTFOUNDELEM > 5) {
+                            await this.response(null, this.amount, Error.NOTFOUNDELEM);
+                        }
+                        this.Error_NOTFOUNDELEM++;
                         break
 
                     case Error.PARSE:
                         Console.error('[+] Error.PARSE')
-                        //some do
+                        if (this.Error_PARSE > 5) {
+                            await this.response(null, this.amount, Error.PARSE);
+                        }
+                        this.Error_PARSE++;
                         break
 
                     case Error.PROXY:
@@ -369,17 +461,20 @@ export class SberBank {
 
                     case Error.TIMEEND:
                         Console.error('[+] Error.TIMEEND')
-                        //some do
+                        if (this.Error_TIMEEND > 5) {
+                            await this.response(null, this.amount, Error.TIMEEND);
+                        }
+                        this.Error_TIMEEND++;
                         break
 
                     case Error.SESSIONERROR:
                         Console.error('[+] Error.SESSIONERROR')
-                        //some do
+                        if (this.Error_SESSIONERROR > 5) {
+                            await this.response(null, this.amount, Error.SESSIONERROR);
+                        }
+                        this.Error_SESSIONERROR++;
                         break
-                    case Error.REQVER:
-                        Console.error('[+] Error.REQVER')
-                        //some do
-                        break
+
                 }
             }
         }

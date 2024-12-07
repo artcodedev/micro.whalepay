@@ -33,7 +33,7 @@ interface Proxy {
 interface SberBank_RUB {
   login: string
   password: string
-  amount: string
+  amount: number
   proxy: Proxy
   timeout: number
   trx: string
@@ -71,7 +71,7 @@ app.post('/micro/payments/sberbank_rub', async (c) => {
 
       console.log("start micro")
 
-      let s = new SberBank(req.login, req.password, req.trx, req.amount, req.timeout, req.proxy);
+      let s = new SberBank(req.login, req.password, req.trx, req.amount, req.timeout, req.proxy, req.session_uid);
 
       s.payment()
 
