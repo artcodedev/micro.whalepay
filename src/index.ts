@@ -53,7 +53,7 @@ app.get('/', async (c) => {
 
 
 /*
-*** Microservice only SBERBANK (RUB) 
+*** Microservice only SBERBANK (RUB)
 */
 app.post('/micro/payments/sberbank_rub', async (c) => {
 
