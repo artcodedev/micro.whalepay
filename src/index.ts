@@ -96,6 +96,19 @@ app.get('/daemon', (c) => {
   return c.json({ page: 'payments' });
 });
 
+
+
+app.get('/test', (c) => {
+
+  /*
+  *** only test 
+  */
+  // let s = new SberBank(req.login, req.password, req.trx, req.amount, req.timeout, req.proxy, req.session_uid);
+
+  // s.payment()
+  return c.json({ page: 'payments' });
+});
+
 const port = 3005;
 
 Console.log(`Server is running on http://localhost:${port}`);

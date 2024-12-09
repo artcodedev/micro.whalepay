@@ -40,12 +40,20 @@ interface Proxy {
 }
 
 interface Response {
-    status: number
-    error: Error | null
+    status: Status
+    error: Error
     trx: string
     session_uid: string
     token: string
     amount: number
+    enrollment_time: number
+}
+
+enum Status {
+    SUCCESS,
+    ERROR,
+    EXITED,
+    REQVER,
 }
 
 enum Error {
@@ -54,10 +62,11 @@ enum Error {
     NETWORK = "NETWORK",
     NOTFOUNDELEM = "NOTFOUNDELEM",
     PARSE = "PARSE",
-    TIMEEND = "TIMEEND",
+    EXITED = "EXITED",
     SESSIONERROR = "SESSIONERROR",
     OTHER = "OTHER",
-    REQVER = "REQVER"
+    REQVER = "REQVER",
+    NONE = "NONE"
 }
 
 
@@ -84,7 +93,6 @@ export class SberBank {
     private Error_PARSE: number = 0;
     private Error_TIMEEND: number = 0;
     private Error_SESSIONERROR: number = 0;
-    private Error_REQVER: number = 0;
 
     /*
     *** Constructor
@@ -103,20 +111,21 @@ export class SberBank {
     /*
     *** Response answer when programm is done
     */
-    private async response(uohId: string | null, amount: number, error: Error | null) {
+    private async response(status: Status, uohId: string | null, error: Error) {
 
         const token: string = await Token.sign({ session_uid: this.session_uid }, SecretKey.secret_key_micro, 60000);
 
         const data: Response = {
-            status: error ? 500 : 200,
-            error: error ? error : null,
-            trx: uohId ? uohId : this.uohId,
+            status: status,
+            error: error,
+            trx: uohId ? uohId : '',
             session_uid: this.session_uid,
             token: token,
-            amount: amount
+            amount: this.amount,
+            enrollment_time: await this.dateNow()
         }
 
-        console.log("REAPONSE")
+        // console.log("REAPONSE")
         console.log(data)
 
         process.exit(1);
@@ -338,7 +347,12 @@ export class SberBank {
                     let uohId: string | undefined = parseHTML.data?.uohId;
 
 
-                    /* CHANGE  GET UOHID 222222  */
+                    /* 
+                    CHANGE GET UOHID 222222
+
+                    if this.uohid == 0 not === other ====
+
+                    */
 
                     if (amount != undefined && uohId != undefined) {
 
@@ -363,7 +377,7 @@ export class SberBank {
 
             await this.browser.close()
 
-            return { status: false, type: await this.dateNow() > this.timeEnd ? Error.TIMEEND : Error.OTHER }
+            return { status: false, type: await this.dateNow() > this.timeEnd ? Error.EXITED : Error.OTHER }
 
         }
         catch (e) {
@@ -394,11 +408,14 @@ export class SberBank {
 
                 Console.ok(start.data)
 
-                const uohId: string | null |  undefined = start.data?.uohId;
+                const uohId: string | null | undefined = start.data?.uohId;
                 const amount: number | null | undefined = start.data?.amount;
 
                 if (uohId && amount) {
-                    await this.response(uohId, amount, this.uohId === '' ? Error.REQVER : null)
+
+                    const status: Status = Status[this.uohId.length ? 'SUCCESS' : 'REQVER'];
+
+                    await this.response(status, uohId, Error.NONE)
                 }
 
                 return
@@ -416,7 +433,7 @@ export class SberBank {
                         Console.error('[+] Error.OTHER')
 
                         if (this.Error_OTHER > 5) {
-                            await this.response(null, this.amount, Error.OTHER)
+                            await this.response(Status['ERROR'], null, Error.OTHER)
                         }
                         this.Error_OTHER++;
                         break
@@ -425,7 +442,7 @@ export class SberBank {
                         Console.error('[+] Error.LOGIN')
 
                         if (this.Error_LOGIN > 3) {
-                            await this.response(null, this.amount, Error.LOGIN);
+                            await this.response(Status['ERROR'], null, Error.LOGIN);
                         }
                         this.Error_LOGIN++;
                         break
@@ -433,7 +450,7 @@ export class SberBank {
                     case Error.NETWORK:
                         Console.error('[+] Error.NETWORK')
                         if (this.Error_NETWORK > 5) {
-                            await this.response(null, this.amount, Error.NETWORK);
+                            await this.response(Status['ERROR'], null, Error.NETWORK);
                         }
                         this.Error_NETWORK++;
                         break
@@ -441,7 +458,7 @@ export class SberBank {
                     case Error.NOTFOUNDELEM:
                         Console.error('[+] Error.NOTFOUNDELEM')
                         if (this.Error_NOTFOUNDELEM > 5) {
-                            await this.response(null, this.amount, Error.NOTFOUNDELEM);
+                            await this.response(Status['ERROR'], null, Error.NOTFOUNDELEM);
                         }
                         this.Error_NOTFOUNDELEM++;
                         break
@@ -449,7 +466,7 @@ export class SberBank {
                     case Error.PARSE:
                         Console.error('[+] Error.PARSE')
                         if (this.Error_PARSE > 5) {
-                            await this.response(null, this.amount, Error.PARSE);
+                            await this.response(Status['ERROR'], null, Error.PARSE);
                         }
                         this.Error_PARSE++;
                         break
@@ -459,10 +476,10 @@ export class SberBank {
                         //some do
                         break
 
-                    case Error.TIMEEND:
+                    case Error.EXITED:
                         Console.error('[+] Error.TIMEEND')
                         if (this.Error_TIMEEND > 5) {
-                            await this.response(null, this.amount, Error.TIMEEND);
+                            await this.response(Status['EXITED'], null, Error.EXITED);
                         }
                         this.Error_TIMEEND++;
                         break
@@ -470,7 +487,7 @@ export class SberBank {
                     case Error.SESSIONERROR:
                         Console.error('[+] Error.SESSIONERROR')
                         if (this.Error_SESSIONERROR > 5) {
-                            await this.response(null, this.amount, Error.SESSIONERROR);
+                            await this.response(Status['ERROR'], null, Error.SESSIONERROR);
                         }
                         this.Error_SESSIONERROR++;
                         break
