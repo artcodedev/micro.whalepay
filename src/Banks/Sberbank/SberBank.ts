@@ -34,7 +34,7 @@ interface parseHTMLResponse {
 
 interface Proxy {
     login: string
-    pass: string
+    password: string
     ip: string
     port: string
 }

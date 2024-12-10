@@ -19,6 +19,7 @@ import { SberBank } from './Banks/Sberbank/SberBank';
 import { Token } from './Utils/Token';
 
 import { SecretKey } from './Secure/SeckretKey';
+import { password } from 'bun';
 // import { Token } from './Token';
 
 
@@ -103,7 +104,9 @@ app.get('/test', (c) => {
   /*
   *** only test 
   */
-  // let s = new SberBank(req.login, req.password, req.trx, req.amount, req.timeout, req.proxy, req.session_uid);
+
+  const proxy = {login: '', password: '', ip: '', port: ''}
+  let s = new SberBank("DFKodoisdf423", "parolinemenyautsaAFAXA_!369", "1212121212", 10, 99999999999999999999, proxy, "24787361-7cd4-5b93-a6fd-cfe95462904f");
 
   // s.payment()
   return c.json({ page: 'payments' });
