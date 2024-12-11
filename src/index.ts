@@ -19,14 +19,14 @@ import { SberBank } from './Banks/Sberbank/SberBank';
 import { Token } from './Utils/Token';
 
 import { SecretKey } from './Secure/SeckretKey';
-import { password } from 'bun';
+import {SberBankTRX } from './Banks/Sberbank/SberBankTRX'
 // import { Token } from './Token';
 
 
 
 interface Proxy {
   login: string
-  pass: string
+  password: string
   ip: string
   port: string
 }
@@ -35,9 +35,15 @@ interface SberBank_RUB {
   login: string
   password: string
   amount: number
-  proxy: Proxy
   timeout: number
   trx: string
+  token: string
+  session_uid: string
+}
+
+interface SberBank_RUB_TRX {
+  login: string
+  password: string
   token: string
   session_uid: string
 }
@@ -54,7 +60,7 @@ app.get('/', async (c) => {
 
 
 /*
-*** Microservice only SBERBANK (RUB)
+*** Microservice only SBERBANK (RUB) 
 */
 app.post('/micro/payments/sberbank_rub', async (c) => {
 
@@ -72,9 +78,9 @@ app.post('/micro/payments/sberbank_rub', async (c) => {
 
       console.log("start micro")
 
-      let s = new SberBank(req.login, req.password, req.trx, req.amount, req.timeout, req.proxy, req.session_uid);
+      // let s = new SberBank(req.login, req.password, req.trx, req.amount, req.timeout, req.proxy, req.session_uid);
 
-      s.payment()
+      // s.payment()
 
       return c.json({status: 200});
 
@@ -105,14 +111,50 @@ app.get('/test', (c) => {
   *** only test 
   */
 
-  const proxy = {login: '', password: '', ip: '', port: ''}
-  let s = new SberBank("DFKodoisdf423", "parolinemenyautsaAFAXA_!369", "1212121212", 10, 99999999999999999999, proxy, "24787361-7cd4-5b93-a6fd-cfe95462904f");
+  let s = new SberBankTRX("DFKodoisdf423", "parolinemenyautsaAFAXA_!369", "24787361-7cd4-5b93-a6fd-cfe95462904f");
+
+  // let s = new SberBank("DFKodoisdf423", "parolinemenyautsaAFAXA_!369", "28613699-ebee-4dd7-ab9a-7351673b34901", 99, 999999999999999999999999999999999999999, proxy, "24787361-7cd4-5b93-a6fd-cfe95462904f");
+
+  s.payment()
 
   // s.payment()
-  return c.json({ page: 'payments' });
+  return c.json({ page: 'test' });
+
+
 });
 
-const port = 3005;
+
+app.post('/micro/payments/sberbank_rub_trx', async (c) => {
+
+  const req: SberBank_RUB_TRX = await c.req.json();
+
+  if (req.token) {
+
+    const token: boolean = await Token.verify(req.token, SecretKey.secret_key_micro);
+
+    console.log(`Token ${token}`)
+
+    if (token) {
+
+      console.log("start micro trx");
+
+      const sberbank_trx = new SberBankTRX(req.login, req.password, req.session_uid);
+
+      sberbank_trx.payment()
+
+      return c.json({status: 200});
+
+    }
+
+    return c.json({status: 500, message: "token in incorrect"});
+  }
+
+  return c.json({status: 400, message: "token not found"});
+
+});
+
+
+const port = 3006;
 
 Console.log(`Server is running on http://localhost:${port}`);
 

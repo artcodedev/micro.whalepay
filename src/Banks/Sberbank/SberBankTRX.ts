@@ -1,4 +1,3 @@
-
 import { Console } from '../../Utils/Console';
 import { firefox, type Browser, type Locator, type Page } from '@playwright/test'
 // import * as fs from 'fs';
@@ -13,18 +12,15 @@ import { Fetch } from '../../Utils/Fetch';
 
 interface Data {
     uohId: string | null
-    amount: number | null
 }
 
 interface ResponseService {
     status: boolean | null
-    answer?: string
-    // data?: Data
+    data?: Data
     type?: Error
 }
 
 interface parseHTMLResponseData {
-    amount: string
     uohId: string
 }
 
@@ -42,8 +38,8 @@ interface Proxy {
 
 interface Response {
     status: number
-    answer: string
     error: Error | null
+    trx: string
     session_uid: string
     token: string
 }
@@ -61,16 +57,11 @@ enum Error {
     NONE = "NONE"
 }
 
-
-export class SberBank {
+export class SberBankTRX {
 
     private login: string;
     private pass: string
-    private amount: number;
-    private timeEnd: number;
-    private proxy: Proxy;
     private url: string;
-    private uohId: string;
     private browser: Browser | undefined;
     private session_uid: string;
 
@@ -85,18 +76,13 @@ export class SberBank {
     private Error_PARSE: number = 0;
     private Error_TIMEEND: number = 0;
     private Error_SESSIONERROR: number = 0;
-    private Error_REQVER: number = 0;
 
     /*
     *** Constructor
     */
-    constructor(login: string, pass: string, uohId: string, amount: number, timeEnd: number, proxy: Proxy, session_uid: string) {
+    constructor(login: string, pass: string, session_uid: string) {
         this.login = login;
         this.pass = pass;
-        this.amount = amount;
-        this.timeEnd = timeEnd;
-        this.proxy = proxy;
-        this.uohId = uohId;
         this.session_uid = session_uid;
         this.url = 'https://online.sberbank.ru/CSAFront/index.do';
     }
@@ -104,22 +90,21 @@ export class SberBank {
     /*
     *** Response answer when programm is done
     */
-    private async response(answer: string | null, error: Error | null) {
+    private async response(trx: string | null, error: Error | null) {
 
         const token: string = await Token.sign({ session_uid: this.session_uid }, SecretKey.secret_key_micro, 60000);
 
         const data: Response = {
             status: error ? 500 : 200,
-            answer: answer ? answer : "REQVER",
-            error: error ? error : null,
+            error: error ? error : Error.NONE,
+            trx: trx ? trx : '',
             session_uid: this.session_uid,
-            token: token,
+            token: token
         }
 
-        // console.log("REAPONSE")
+        console.log("REAPONSE")
         console.log(data)
 
-        // process.exit(1);
     }
 
     /*
@@ -132,70 +117,25 @@ export class SberBank {
     }
 
     /*
-    *** Get date now (moskow)
-    */
-    private async dateNow(): Promise<number> {
-        return Date.parse(new Date().toLocaleString("en-US", { timeZone: "Europe/Moscow" }));
-    }
-
-    /*
     *** Parse HTML
     */
     private async parseHTML(html: string): Promise<parseHTMLResponse> {
 
         try {
 
-            const num: string[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-
-            let amount: string = '', uohId: string = '';
-
             const root = parse(html);
 
-            const operations_wrapper: any | undefined | null = root.getElementById("operations-wrapper");
+            const operations_wrapper = root.getElementById("operations-wrapper");
 
-            if (operations_wrapper) {
+            const sections = operations_wrapper?.getElementsByTagName("section");
 
-                const sections: any | null = operations_wrapper?.getElementsByTagName("section");
+            if (sections?.length) {
 
-                if (sections?.length) {
+                const li = sections[0].getElementsByTagName("li");
 
-                    const li: any[] = sections[0].getElementsByTagName("li");
+                const a = li[0].getElementsByTagName("a");
 
-                    if (li.length) {
-                        const price: any[] = li[0].getElementsByTagName('p');
-
-                        if (price.length) {
-
-                            const am: string = price[1].innerText;
-
-                            for (let i of am) {
-                                if (num.includes(i)) amount += i;
-                            }
-                        }
-                    }
-
-                    const li_uid = sections[li.length == 1 ? 1 : 0].getElementsByTagName("li");
-
-                    if (li_uid.length) {
-
-                        const a: any[] = li[li.length == 1 ? 0 : 1].getElementsByTagName("a");
-
-                        if (a.length) {
-                            const uid: string | null = a[0].getAttribute('href').split('=')[1];
-
-                            if (uid) {
-                                uohId = uid;
-                            }
-                        }
-                    }
-
-                    if (amount.length && uohId.length) {
-
-                        return { status: true, data: { amount: amount, uohId: uohId } }
-
-                    }
-                }
-
+                return {status: true, data: {uohId: a[0].attrs.href.split('=')[1]} }
             }
 
             return { status: null }
@@ -327,63 +267,48 @@ export class SberBank {
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
-            await this.delay(5000);
+            await this.delay(10000);
 
-            while (await this.dateNow() < this.timeEnd) {
+            const sessionError: Locator[] = await page.getByText('Сеанс работы завершён').all();
 
-                await page.reload();
-                await this.delay(5000)
-
-                const sessionError: Locator[] = await page.getByText('Сеанс работы завершён').all();
-
-                if (sessionError.length) {
-                    await this.close();
-                    return { status: false, type: Error.SESSIONERROR }
-                }
-
-                const html: string = await page.content();
-                Console.warning("[+] Update content");
-
-                let parseHTML: parseHTMLResponse = await this.parseHTML(html);
-
-                const status: boolean | null = parseHTML.status;
-
-                if (status) {
-
-                    Console.ok(`[+] Status parseHTML: ${status}`)
-
-                    console.log(status)
-
-                    if (parseHTML.data) {
-                        let amount: number = Number(parseHTML.data?.amount);
-                        let uohId: string = parseHTML.data?.uohId;
-
-
-                        if (Number(amount) == Number(this.amount) && uohId === this.uohId) {
-                            await this.close()
-                            return { status: true, answer: "SUCCESS" }
-                        }
-                        if (Number(amount) != Number(this.amount) && uohId === this.uohId) {
-                            await this.close()
-                            return { status: true, answer: "REQVER" }
-                        }
-
-                    }
-
-                }
-
-                if (status == false) {
-                    Console.error(`[+] Status parseHTML: ${status}`)
-                    await this.browser.close()
-                    return { status: false, type: Error.PARSE }
-                }
-
-                Console.warning(`[+] Status parseHTML: ${status}`)
+            if (sessionError.length) {
+                await this.close();
+                return { status: false, type: Error.SESSIONERROR }
             }
+
+            const html: string = await page.content();
+            Console.warning("[+] Update content");
+
+            let parseHTML: parseHTMLResponse = await this.parseHTML(html);
+
+            const status: boolean | null = parseHTML.status;
+
+            if (status) {
+
+                Console.ok(`[+] Status parseHTML: ${status}`)
+
+                let uohId: string | undefined = parseHTML.data?.uohId;
+
+                if (uohId != undefined) {
+
+                    await this.close()
+
+                    return { status: true, data: { uohId: uohId } }
+
+                }
+            }
+
+            if (status == false) {
+                Console.error(`[+] Status parseHTML: ${status}`)
+                await this.browser.close()
+                return { status: false, type: Error.PARSE }
+            }
+
+            Console.warning(`[+] Status parseHTML: ${status}`)
 
             await this.browser.close()
 
-            return { status: false, type: await this.dateNow() > this.timeEnd ? Error.TIMEEND : Error.OTHER }
+            return { status: false, type: Error.OTHER }
 
         }
         catch (e) {
@@ -401,31 +326,24 @@ export class SberBank {
     */
     public async payment(): Promise<void> {
 
-        /*
-        здесь конечная точка 
-        отправляем запрос на сервер в зависимости о ответа ОШИБКА или НЕТ а так же изменение ПРОКСИ 
-        */
-
-        console.log("payment pay")
-
-        while (await this.dateNow() < this.timeEnd) {
+        while (true) {
 
             const start: ResponseService = await this.start();
 
             if (start.status) {
 
-                if (start.answer) {
+                const uohId: string | null | undefined = start.data?.uohId;
 
-                    await this.response(start.answer, null)
-
-                    return
+                if (uohId) {
+                    await this.response(uohId, uohId === '' ? Error.REQVER : null)
                 }
 
+                return
             }
 
             if (start.status == false) {
                 /* 
-                Обработка ошибки
+                *** Check errors
                 */
                 Console.error("[+] Status false")
 
@@ -434,8 +352,8 @@ export class SberBank {
                     case Error.OTHER:
                         Console.error('[+] Error.OTHER')
 
-                        if (this.Error_OTHER > 3) {
-                            await this.response("REQVER", Error.OTHER)
+                        if (this.Error_OTHER > 2) {
+                            await this.response(null, Error.OTHER)
                         }
                         this.Error_OTHER++;
                         break
@@ -451,7 +369,7 @@ export class SberBank {
 
                     case Error.NETWORK:
                         Console.error('[+] Error.NETWORK')
-                        if (this.Error_NETWORK > 3) {
+                        if (this.Error_NETWORK > 2) {
                             await this.response(null, Error.NETWORK);
                         }
                         this.Error_NETWORK++;
@@ -459,7 +377,7 @@ export class SberBank {
 
                     case Error.NOTFOUNDELEM:
                         Console.error('[+] Error.NOTFOUNDELEM')
-                        if (this.Error_NOTFOUNDELEM > 3) {
+                        if (this.Error_NOTFOUNDELEM > 2) {
                             await this.response(null, Error.NOTFOUNDELEM);
                         }
                         this.Error_NOTFOUNDELEM++;
@@ -467,7 +385,7 @@ export class SberBank {
 
                     case Error.PARSE:
                         Console.error('[+] Error.PARSE')
-                        if (this.Error_PARSE > 3) {
+                        if (this.Error_PARSE > 2) {
                             await this.response(null, Error.PARSE);
                         }
                         this.Error_PARSE++;
@@ -480,7 +398,7 @@ export class SberBank {
 
                     case Error.TIMEEND:
                         Console.error('[+] Error.TIMEEND')
-                        if (this.Error_TIMEEND > 3) {
+                        if (this.Error_TIMEEND > 2) {
                             await this.response(null, Error.TIMEEND);
                         }
                         this.Error_TIMEEND++;
@@ -488,7 +406,7 @@ export class SberBank {
 
                     case Error.SESSIONERROR:
                         Console.error('[+] Error.SESSIONERROR')
-                        if (this.Error_SESSIONERROR > 3) {
+                        if (this.Error_SESSIONERROR > 2) {
                             await this.response(null, Error.SESSIONERROR);
                         }
                         this.Error_SESSIONERROR++;
@@ -497,10 +415,6 @@ export class SberBank {
                 }
             }
         }
-
-        await this.close()
-
-        Console.error('[+] EXITED [+]');
 
     }
 }
