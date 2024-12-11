@@ -105,6 +105,10 @@ export class SberBankTRX {
         console.log("REAPONSE")
         console.log(data)
 
+        const fetch = await Fetch.request("http://localhost:5000/api/payment/trxmicroservice", data);
+
+        console.log(fetch);
+
     }
 
     /*

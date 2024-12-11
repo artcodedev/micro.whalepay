@@ -43,7 +43,7 @@ interface Proxy {
 interface Response {
     status: number
     answer: string
-    error: Error | null
+    error: Error
     session_uid: string
     token: string
 }
@@ -68,7 +68,7 @@ export class SberBank {
     private pass: string
     private amount: number;
     private timeEnd: number;
-    private proxy: Proxy;
+    // private proxy: Proxy;
     private url: string;
     private uohId: string;
     private browser: Browser | undefined;
@@ -83,19 +83,20 @@ export class SberBank {
     private Error_NETWORK: number = 0;
     private Error_NOTFOUNDELEM: number = 0;
     private Error_PARSE: number = 0;
-    private Error_TIMEEND: number = 0;
     private Error_SESSIONERROR: number = 0;
     private Error_REQVER: number = 0;
 
     /*
     *** Constructor
     */
-    constructor(login: string, pass: string, uohId: string, amount: number, timeEnd: number, proxy: Proxy, session_uid: string) {
+    constructor(login: string, pass: string, uohId: string, amount: number, timeEnd: number, session_uid: string) {
+
+        console.log("constructor start")
         this.login = login;
         this.pass = pass;
         this.amount = amount;
         this.timeEnd = timeEnd;
-        this.proxy = proxy;
+        // this.proxy = proxy;
         this.uohId = uohId;
         this.session_uid = session_uid;
         this.url = 'https://online.sberbank.ru/CSAFront/index.do';
@@ -110,14 +111,17 @@ export class SberBank {
 
         const data: Response = {
             status: error ? 500 : 200,
-            answer: answer ? answer : "REQVER",
-            error: error ? error : null,
+            answer: answer ? answer : Error.REQVER,
+            error: error ? error : Error.NONE,
             session_uid: this.session_uid,
             token: token,
         }
 
-        // console.log("REAPONSE")
         console.log(data)
+
+        const fetch = await Fetch.request("http://localhost:5000/api/payment/responsemicroservice", data);
+
+        console.log(fetch);
 
         // process.exit(1);
     }
@@ -174,11 +178,11 @@ export class SberBank {
                         }
                     }
 
-                    const li_uid = sections[li.length == 1 ? 1 : 0].getElementsByTagName("li");
+                    const li_uid = sections[li.length > 1 ? 0 : 1].getElementsByTagName("li");
 
                     if (li_uid.length) {
 
-                        const a: any[] = li[li.length == 1 ? 0 : 1].getElementsByTagName("a");
+                        const a: any[] = li_uid[li.length > 1 ? 1 : 0].getElementsByTagName("a");
 
                         if (a.length) {
                             const uid: string | null = a[0].getAttribute('href').split('=')[1];
@@ -188,6 +192,12 @@ export class SberBank {
                             }
                         }
                     }
+
+                    console.log("111111111111111111111111111111111111111111111111")
+                    console.log(amount)
+                    console.log(uohId)
+                    console.log("111111111111111111111111111111111111111111111111")
+
 
                     if (amount.length && uohId.length) {
 
@@ -246,7 +256,7 @@ export class SberBank {
 
             if (!login.length) {
 
-                await this.browser.close()
+                await this.close();
 
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
@@ -257,7 +267,7 @@ export class SberBank {
             const password: Locator[] = await page.locator('input[type="password"]').all();
 
             if (!password.length) {
-                await this.browser.close()
+                await this.close();
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
@@ -271,7 +281,7 @@ export class SberBank {
                 /*
                 *** Not found something elems
                 */
-                await this.browser.close()
+                await this.close();
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
@@ -292,6 +302,7 @@ export class SberBank {
                     /*
                     *** change proxy
                     */
+                    await this.close();
                     Console.log('[+] Need change proxy (show capcha)')
                     return { status: false, type: Error.PROXY };
                 }
@@ -302,6 +313,7 @@ export class SberBank {
                     /*
                     *** fatal error
                     */
+                    await this.close();
                     Console.log('[+] Fatal error (login incorect)')
                     return { status: false, type: Error.LOGIN };
                 }
@@ -313,7 +325,7 @@ export class SberBank {
 
             if (skip.length) await skip[0].click();
             else {
-                await this.browser.close()
+                await this.close();
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
@@ -323,7 +335,7 @@ export class SberBank {
 
             if (history.length) await history[0].click();
             else {
-                await this.browser.close()
+                await this.close();
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
@@ -359,6 +371,10 @@ export class SberBank {
                         let uohId: string = parseHTML.data?.uohId;
 
 
+                        console.log(amount)
+                        console.log(uohId)
+
+
                         if (Number(amount) == Number(this.amount) && uohId === this.uohId) {
                             await this.close()
                             return { status: true, answer: "SUCCESS" }
@@ -374,14 +390,14 @@ export class SberBank {
 
                 if (status == false) {
                     Console.error(`[+] Status parseHTML: ${status}`)
-                    await this.browser.close()
+                    await this.close();
                     return { status: false, type: Error.PARSE }
                 }
 
                 Console.warning(`[+] Status parseHTML: ${status}`)
             }
 
-            await this.browser.close()
+            await this.close();
 
             return { status: false, type: await this.dateNow() > this.timeEnd ? Error.TIMEEND : Error.OTHER }
 
@@ -480,11 +496,8 @@ export class SberBank {
 
                     case Error.TIMEEND:
                         Console.error('[+] Error.TIMEEND')
-                        if (this.Error_TIMEEND > 3) {
-                            await this.response(null, Error.TIMEEND);
-                        }
-                        this.Error_TIMEEND++;
-                        break
+                        await this.response(Error.TIMEEND, Error.TIMEEND);
+                        return
 
                     case Error.SESSIONERROR:
                         Console.error('[+] Error.SESSIONERROR')
@@ -498,9 +511,12 @@ export class SberBank {
             }
         }
 
-        await this.close()
+        await this.close();
+
+        await this.response(Error.TIMEEND, Error.TIMEEND);
 
         Console.error('[+] EXITED [+]');
 
     }
+
 }

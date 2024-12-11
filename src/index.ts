@@ -76,9 +76,9 @@ app.post('/micro/payments/sberbank_rub', async (c) => {
 
       console.log("start micro")
 
-      // let s = new SberBank(req.login, req.password, req.trx, req.amount, req.timeout, req.proxy, req.session_uid);
-
-      // s.payment()
+      let sber = new SberBank(req.login, req.password, req.trx, req.amount, req.timeout, req.session_uid);
+      
+      sber.payment();
 
       return c.json({status: 200});
 
@@ -101,8 +101,6 @@ app.get('/daemon', (c) => {
   return c.json({ page: 'payments' });
 });
 
-
-
 app.get('/test', (c) => {
 
   /*
@@ -120,7 +118,6 @@ app.get('/test', (c) => {
 
 
 });
-
 
 app.post('/micro/payments/sberbank_rub_trx', async (c) => {
 
