@@ -21,7 +21,6 @@ import { Token } from './Utils/Token';
 import { SecretKey } from './Secure/SeckretKey';
 import {SberBankTRX } from './Banks/Sberbank/SberBankTRX'
 
-
 interface Proxy {
   login: string
   password: string
@@ -55,7 +54,6 @@ app.get('/', async (c) => {
   return c.text('Please indicate the correct parameters');
 
 });
-
 
 /*
 *** Microservice only SBERBANK (RUB) 
@@ -101,23 +99,6 @@ app.get('/daemon', (c) => {
   return c.json({ page: 'payments' });
 });
 
-app.get('/test', (c) => {
-
-  /*
-  *** only test 
-  */
-
-  let s = new SberBankTRX("DFKodoisdf423", "parolinemenyautsaAFAXA_!369", "24787361-7cd4-5b93-a6fd-cfe95462904f");
-
-  // let s = new SberBank("DFKodoisdf423", "parolinemenyautsaAFAXA_!369", "28613699-ebee-4dd7-ab9a-7351673b34901", 99, 999999999999999999999999999999999999999, proxy, "24787361-7cd4-5b93-a6fd-cfe95462904f");
-
-  s.payment()
-
-  // s.payment()
-  return c.json({ page: 'test' });
-
-
-});
 
 app.post('/micro/payments/sberbank_rub_trx', async (c) => {
 
@@ -147,7 +128,6 @@ app.post('/micro/payments/sberbank_rub_trx', async (c) => {
   return c.json({status: 400, message: "token not found"});
 
 });
-
 
 const port = 3006;
 
