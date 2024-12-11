@@ -20,8 +20,6 @@ import { Token } from './Utils/Token';
 
 import { SecretKey } from './Secure/SeckretKey';
 import {SberBankTRX } from './Banks/Sberbank/SberBankTRX'
-// import { Token } from './Token';
-
 
 
 interface Proxy {
