@@ -193,12 +193,6 @@ export class SberBank {
                         }
                     }
 
-                    console.log("111111111111111111111111111111111111111111111111")
-                    console.log(amount)
-                    console.log(uohId)
-                    console.log("111111111111111111111111111111111111111111111111")
-
-
                     if (amount.length && uohId.length) {
 
                         return { status: true, data: { amount: amount, uohId: uohId } }
