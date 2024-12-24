@@ -70,7 +70,7 @@ export class SberBank {
     private timeEnd: number;
     // private proxy: Proxy;
     private url: string;
-    private uohId: string;
+    private uohId: string | null = null;
     private browser: Browser | undefined;
     private session_uid: string;
 
@@ -97,7 +97,7 @@ export class SberBank {
         this.amount = amount;
         this.timeEnd = timeEnd;
         // this.proxy = proxy;
-        this.uohId = uohId;
+        // this.uohId = ;
         this.session_uid = session_uid;
         this.url = 'https://online.sberbank.ru/CSAFront/index.do';
     }
@@ -284,7 +284,7 @@ export class SberBank {
             const url: string = await page.url();
 
             /*
-            *** if url will not change because show capcha or incorrect password|login
+            *** if url will not change because show capcha or incorrect password | login
             */
 
             if (url == this.url) {
@@ -368,15 +368,31 @@ export class SberBank {
                         console.log(amount)
                         console.log(uohId)
 
+                        if (this.uohId == null) { }
 
-                        if (Number(amount) == Number(this.amount) && uohId === this.uohId) {
-                            await this.close()
-                            return { status: true, answer: "SUCCESS" }
+                        if (typeof this.uohId === 'string' && this.uohId != null) {
+
+                            if (Number(amount) == Number(this.amount) && uohId === this.uohId) {
+                                await this.close()
+                                return { status: true, answer: "SUCCESS" }
+                            }
+
+                            if (Number(amount) != Number(this.amount) && uohId === this.uohId) {
+                                await this.close()
+                                return { status: true, answer: "REQVER" }
+                            }
+                            
                         }
-                        if (Number(amount) != Number(this.amount) && uohId === this.uohId) {
-                            await this.close()
-                            return { status: true, answer: "REQVER" }
-                        }
+
+
+                        // if (Number(amount) == Number(this.amount) && uohId === this.uohId) {
+                        //     await this.close()
+                        //     return { status: true, answer: "SUCCESS" }
+                        // }
+                        // if (Number(amount) != Number(this.amount) && uohId === this.uohId) {
+                        //     await this.close()
+                        //     return { status: true, answer: "REQVER" }
+                        // }
 
                     }
 

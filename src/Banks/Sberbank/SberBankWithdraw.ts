@@ -1,48 +1,18 @@
-import { Console } from '../../Utils/Console';
+
+import { SecretKey } from "../../Secure/SeckretKey";
+import { Console } from "../../Utils/Console";
+import { Fetch } from "../../Utils/Fetch";
+import { Token } from "../../Utils/Token";
 import { firefox, type Browser, type Locator, type Page } from '@playwright/test'
-// import * as fs from 'fs';
-import { parse } from 'node-html-parser';
-import { Token } from '../../Utils/Token';
-import { SecretKey } from '../../Secure/SeckretKey';
-import { Fetch } from '../../Utils/Fetch';
 
-/*
-*** use proxy
-*/
 
-interface Data {
-    uohId: string | null
-}
+
 
 interface ResponseService {
     status: boolean | null
-    data?: Data
     type?: Error
 }
 
-interface parseHTMLResponseData {
-    uohId: string
-}
-
-interface parseHTMLResponse {
-    status: boolean | null
-    data?: parseHTMLResponseData | null
-}
-
-interface Proxy {
-    login: string
-    password: string
-    ip: string
-    port: string
-}
-
-interface Response {
-    status: number
-    error: Error | null
-    trx: string
-    session_uid: string
-    token: string
-}
 
 enum Error {
     PROXY = "PROXY",
@@ -57,13 +27,17 @@ enum Error {
     NONE = "NONE"
 }
 
-export class SberBankTRX {
+export class SberBankWithdraw {
 
-    private login: string;
-    private pass: string
-    private url: string;
+
     private browser: Browser | undefined;
-    private session_uid: string;
+    private url: string;
+    private login: string;
+    private pass: string;
+    private id : number;
+    private amount: number;
+    private number_card: string
+    private phone: string
 
     /*
     *** Count errors
@@ -74,35 +48,35 @@ export class SberBankTRX {
     private Error_NETWORK: number = 0;
     private Error_NOTFOUNDELEM: number = 0;
     private Error_PARSE: number = 0;
-    private Error_TIMEEND: number = 0;
     private Error_SESSIONERROR: number = 0;
 
-    /*
-    *** Constructor
-    */
-    constructor(login: string, pass: string, session_uid: string) {
+    constructor(login: string, pass: string, id: number, amount: number, number_card: string, phone: string) {
         this.login = login;
         this.pass = pass;
-        this.session_uid = session_uid;
+        this.id = id
+        this.amount = amount
+        this.number_card = number_card
+        this.phone= phone
         this.url = 'https://online.sberbank.ru/CSAFront/index.do';
     }
 
     /*
     *** Response answer when programm is done
     */
-    private async response(trx: string | null, error: Error | null) {
+    private async response(error: Error | null) {
 
-        const token: string = await Token.sign({ session_uid: this.session_uid }, SecretKey.secret_key_micro, 60000);
+        const token: string = await Token.sign({ session_uid: '' }, SecretKey.secret_key_micro, 60000);
 
-        const data: Response = {
+        const data = {
             status: error ? 500 : 200,
             error: error ? error : Error.NONE,
-            trx: trx ? trx : '',
-            session_uid: this.session_uid,
+            id: this.id,
             token: token
         }
 
-        await Fetch.request("http://localhost:5000/api/payment/trxmicroservice", data);
+        console.log(data)
+
+        // await Fetch.request("http://localhost:5000/api/payment/trxmicroservice", data);
 
     }
 
@@ -113,36 +87,6 @@ export class SberBankTRX {
         return new Promise(function (resolve) {
             setTimeout(resolve, time)
         });
-    }
-
-    /*
-    *** Parse HTML
-    */
-    private async parseHTML(html: string): Promise<parseHTMLResponse> {
-
-        try {
-
-            const root = parse(html);
-
-            const operations_wrapper = root.getElementById("operations-wrapper");
-
-            const sections = operations_wrapper?.getElementsByTagName("section");
-
-            if (sections?.length) {
-
-                const li = sections[0].getElementsByTagName("li");
-
-                const a = li[0].getElementsByTagName("a");
-
-                return {status: true, data: {uohId: a[0].attrs.href.split('=')[1]} }
-            }
-
-            return { status: null }
-        }
-        catch (e) {
-            return { status: false }
-        }
-
     }
 
     /*
@@ -231,6 +175,7 @@ export class SberBankTRX {
                     /*
                     *** change proxy
                     */
+                    await this.delay(5000);
                     Console.log('[+] Need change proxy (show capcha)')
                     return { status: false, type: Error.PROXY };
                 }
@@ -241,6 +186,8 @@ export class SberBankTRX {
                     /*
                     *** fatal error
                     */
+
+                    await this.delay(5000);
                     Console.log('[+] Fatal error (login incorect)')
                     return { status: false, type: Error.LOGIN };
                 }
@@ -256,54 +203,108 @@ export class SberBankTRX {
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
-            await this.delay(5000);
+            await this.delay(10000);
 
-            const history: Locator[] = await page.getByText('История').all();
+            Console.log('[+] Search "Новый перевод"')
+            const new_translation: Locator[] = await page.getByText('Новый перевод').all();
 
-            if (history.length) await history[0].click();
+            if (new_translation.length) await new_translation[0].click();
             else {
                 await this.browser.close()
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
-            await this.delay(10000);
+            await this.delay(3000);
 
-            const sessionError: Locator[] = await page.getByText('Сеанс работы завершён').all();
+            Console.log('[+] Search input[type="tel"]')
+            const number_card: Locator[] = await page.locator('input[type="tel"]').all();
 
-            if (sessionError.length) {
-                await this.close();
-                return { status: false, type: Error.SESSIONERROR }
-            }
-
-            const html: string = await page.content();
-            Console.warning("[+] Update content");
-
-            let parseHTML: parseHTMLResponse = await this.parseHTML(html);
-
-            const status: boolean | null = parseHTML.status;
-
-            if (status) {
-
-                Console.ok(`[+] Status parseHTML: ${status}`)
-
-                let uohId: string | undefined = parseHTML.data?.uohId;
-
-                if (uohId != undefined) {
-
-                    await this.close()
-
-                    return { status: true, data: { uohId: uohId } }
-
-                }
-            }
-
-            if (status == false) {
-                Console.error(`[+] Status parseHTML: ${status}`)
+            if (!number_card.length) {
                 await this.browser.close()
-                return { status: false, type: Error.PARSE }
+                return { status: false, type: Error.NOTFOUNDELEM };
             }
 
-            Console.warning(`[+] Status parseHTML: ${status}`)
+            number_card[0].fill(this.number_card);
+
+            await this.delay(1000);
+
+            Console.log('[+] Search "Продолжить"')
+            const next_step: Locator[] = await page.getByText('Продолжить').all();
+
+            if (next_step.length) await next_step[0].click();
+            else {
+                await this.browser.close()
+                return { status: false, type: Error.NOTFOUNDELEM };
+            }
+
+            await this.delay(5000);
+
+            Console.log('[+] Search "Продолжить v1"')
+            const next_step_v1: Locator[] = await page.locator('button[aria-label="Продолжить"]').all();
+
+            Console.warning(next_step_v1)
+            Console.warning(next_step_v1.length)
+
+            if (next_step_v1.length) await next_step_v1[0].click();
+            else {
+                await this.browser.close()
+                return { status: false, type: Error.NOTFOUNDELEM };
+            }
+
+            await this.delay(5000);
+
+            Console.log('[+] Search input[label="Сумма"]')
+            const amount: Locator[] = await page.locator('input[label="Сумма"]').all();
+
+            if (!amount.length) {
+                await this.browser.close()
+                return { status: false, type: Error.NOTFOUNDELEM };
+            }
+
+            amount[0].fill(this.amount.toString());
+
+            await this.delay(3000);
+
+            Console.log('[+] Search "Продолжить"')
+            const next_step_v2: Locator[] = await page.getByText('Продолжить').all();
+
+            if (next_step_v2.length) await next_step_v2[0].click();
+            else {
+                await this.browser.close()
+                return { status: false, type: Error.NOTFOUNDELEM };
+            }
+
+            await this.delay(4000);
+
+            // get code 
+
+            // aria-label="Поле ввода кода из смс"
+
+            const code_sms: string = '12345'
+
+
+            Console.log('[+] Search input[aria-label="Поле ввода кода из смс"]')
+            const code: Locator[] = await page.locator('input[aria-label="Поле ввода кода из смс"]').all();
+
+            if (!code.length) {
+                await this.browser.close()
+                return { status: false, type: Error.NOTFOUNDELEM };
+            }
+
+            code[0].fill(code_sms);
+
+            await this.delay(1000);
+
+            Console.log('[+] Search "Подтвердить"')
+            const done: Locator[] = await page.getByText('Подтвердить').all();
+
+            if (done.length) await done[0].click();
+            else {
+                await this.browser.close()
+                return { status: false, type: Error.NOTFOUNDELEM };
+            }
+
+            await this.delay(5000);
 
             await this.browser.close()
 
@@ -331,14 +332,17 @@ export class SberBankTRX {
 
             if (start.status) {
 
-                const uohId: string | null | undefined = start.data?.uohId;
-
-                if (uohId) {
-                    await this.response(uohId, uohId === '' ? Error.REQVER : null)
-                }
+                await this.response(null)
 
                 return
+
             }
+
+
+            await this.delay(5000);
+
+
+            return
 
             if (start.status == false) {
                 /* 
@@ -352,7 +356,7 @@ export class SberBankTRX {
                         Console.error('[+] Error.OTHER')
 
                         if (this.Error_OTHER > 2) {
-                            await this.response(null, Error.OTHER)
+                            await this.response(Error.OTHER)
                         }
                         this.Error_OTHER++;
                         break
@@ -361,7 +365,7 @@ export class SberBankTRX {
                         Console.error('[+] Error.LOGIN')
 
                         if (this.Error_LOGIN > 3) {
-                            await this.response(null, Error.LOGIN);
+                            await this.response(Error.LOGIN);
                         }
                         this.Error_LOGIN++;
                         break
@@ -369,7 +373,7 @@ export class SberBankTRX {
                     case Error.NETWORK:
                         Console.error('[+] Error.NETWORK')
                         if (this.Error_NETWORK > 2) {
-                            await this.response(null, Error.NETWORK);
+                            await this.response(Error.NETWORK);
                         }
                         this.Error_NETWORK++;
                         break
@@ -377,7 +381,7 @@ export class SberBankTRX {
                     case Error.NOTFOUNDELEM:
                         Console.error('[+] Error.NOTFOUNDELEM')
                         if (this.Error_NOTFOUNDELEM > 2) {
-                            await this.response(null, Error.NOTFOUNDELEM);
+                            await this.response(Error.NOTFOUNDELEM);
                         }
                         this.Error_NOTFOUNDELEM++;
                         break
@@ -385,7 +389,7 @@ export class SberBankTRX {
                     case Error.PARSE:
                         Console.error('[+] Error.PARSE')
                         if (this.Error_PARSE > 2) {
-                            await this.response(null, Error.PARSE);
+                            await this.response(Error.PARSE);
                         }
                         this.Error_PARSE++;
                         break
@@ -398,7 +402,7 @@ export class SberBankTRX {
                     case Error.SESSIONERROR:
                         Console.error('[+] Error.SESSIONERROR')
                         if (this.Error_SESSIONERROR > 2) {
-                            await this.response(null, Error.SESSIONERROR);
+                            await this.response(Error.SESSIONERROR);
                         }
                         this.Error_SESSIONERROR++;
                         break
@@ -408,4 +412,5 @@ export class SberBankTRX {
         }
 
     }
+
 }
