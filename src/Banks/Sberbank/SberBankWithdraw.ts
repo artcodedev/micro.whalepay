@@ -4,6 +4,7 @@ import { Console } from "../../Utils/Console";
 import { Fetch } from "../../Utils/Fetch";
 import { Token } from "../../Utils/Token";
 import { firefox, type Browser, type Locator, type Page } from '@playwright/test'
+import { SMSCode } from "../../Utils/SMSCode";
 
 
 
@@ -15,6 +16,7 @@ interface ResponseService {
 
 
 enum Error {
+    DELETESMS = "DELETESMS",
     PROXY = "PROXY",
     LOGIN = "LOGIN",
     NETWORK = "NETWORK",
@@ -252,6 +254,17 @@ export class SberBankWithdraw {
             }
 
             await this.delay(5000);
+
+
+            Console.log('[+] Delete all sms')
+            const deleteSMS: {status: boolean} = await SMSCode.deleteSMS(this.phone);
+
+
+            Console.log(`[+] Status sms code ${deleteSMS.status}`)
+            if (deleteSMS.status === false) {
+                await this.browser.close()
+                return { status: false, type: Error.DELETESMS };
+            }
 
             Console.log('[+] Search input[label="Сумма"]')
             const amount: Locator[] = await page.locator('input[label="Сумма"]').all();

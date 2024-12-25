@@ -1,3 +1,4 @@
+import { Console } from "../Utils/Console";
 import { SecretKey } from "../Secure/SeckretKey";
 import { Fetch } from "./Fetch";
 import { Logger } from "./Logger";
@@ -20,16 +21,49 @@ interface requestSMSAnswer {
     data?: string
 }
 
+
+interface requestSMSPortTtyData {
+    phone: string
+    tty: string
+}
+
+
+interface requestSMSPortTty {
+    status: boolean
+    data: requestSMSPortTtyData[]
+} 
+
 export class SMSCode {
 
-    public static async deleteSMS(): Promise<requestSMSAnswer> {
+    
+    /*
+    *** Delete all sms for white list
+    */
+    public static async deleteSMS(phone: string): Promise<requestSMSAnswer> {
 
         try {
+
             const token: string = await Token.sign({ uid: 'uid' }, SecretKey.secret_key_micro, 1000);
 
-            const req: requestSMSRes = await Fetch.request('http://localhost:3005/deleteallmessage', { token: token });
+            const req: requestSMSPortTty = await Fetch.request('http://localhost:3005/getalltty', { token: token });
 
-            return { status: req.status ? true : false }
+            if (req.status) {
+
+                for (const i of req.data ) {
+
+                    if (i.phone.includes(phone)) {
+
+                        const req: {status: boolean} = await Fetch.request('http://localhost:3005/deleteallmessage', { token: token, port: i.tty});
+
+                        Console.log(`[+] Delete all message to number ${i.phone}`)
+                        return {status: req.status }
+                        
+                    }
+                    
+                }
+            }
+
+            return { status: false }
 
         }
 
@@ -39,6 +73,9 @@ export class SMSCode {
         }
     }
 
+    /*
+    *** Get sms code for withdraw
+    */
     public static async getSMS(): Promise<requestSMSAnswer> {
 
         try {
@@ -90,3 +127,7 @@ export class SMSCode {
     }
 
 } 
+
+
+
+(async () => await SMSCode.deleteSMS(''))();
