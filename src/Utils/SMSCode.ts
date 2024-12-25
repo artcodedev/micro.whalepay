@@ -51,13 +51,13 @@ export class SMSCode {
 
                 for (const i of req.data ) {
 
-                    if (i.phone.includes(phone)) {
+                    if (i.phone === phone) {
 
                         const req: {status: boolean} = await Fetch.request('http://localhost:3005/deleteallmessage', { token: token, port: i.tty});
 
-                        Console.log(`[+] Delete all message to number ${i.phone}`)
+                        Console.log(`[+] Delete all message to number ${i.phone} Status: ${req.status}` )
                         return {status: req.status }
-                        
+
                     }
                     
                 }
