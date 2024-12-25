@@ -21,6 +21,7 @@ import { Token } from './Utils/Token';
 import { SecretKey } from './Secure/SeckretKey';
 import { SberBankTRX } from './Banks/Sberbank/SberBankTRX'
 import { SberBankWithdraw } from './Banks/Sberbank/SberBankWithdraw';
+import { SberBankAmount } from './Banks/Sberbank/SberBankAmount';
 
 interface Proxy {
   login: string
@@ -54,6 +55,17 @@ interface SberBankWithdrawRequest {
   number_card: string
   token: string
   phone: string
+}
+
+
+interface SberBankAmountRes {
+
+  token: string
+  login: string
+  pass: string
+  id_card: number
+  uid_bank: string
+  number_card: string
 }
 
 const app = new Hono();
@@ -119,7 +131,7 @@ app.post('/micro/withdraw/sberbank_rub', async (c) => {
 
       const cber = new SberBankWithdraw(req.login, req.pass, req.id, req.amount, req.number_card, req.phone);
 
-      cber.payment();
+      cber.withdraw();
 
       return c.json({ status: 200, message: "request accepted" });
 
@@ -130,6 +142,36 @@ app.post('/micro/withdraw/sberbank_rub', async (c) => {
   }
 
   return c.json({ status: 400, message: "token not found" });
+});
+
+
+/*
+*** Microservice get amount only SBERBANK (RUB) 
+*/
+app.post('/micro/amount/sberbank_rub', async (c) => {
+
+  const req: SberBankAmountRes = await c.req.json();
+
+  const token: boolean = await Token.verify(req.token, SecretKey.secret_key_micro);
+
+  if (req.token) {
+
+    if (token) {
+
+      const cber = new SberBankAmount(req.login, req.pass, req.id_card, req.uid_bank, req.number_card);
+
+      cber.amount();
+
+      return c.json({ status: 200, message: "request accepted" });
+
+    }
+
+    return c.json({ status: 500, message: "token in incorrect" });
+
+  }
+
+  return c.json({ status: 400, message: "token not found" });
+
 });
 
 

@@ -1,19 +1,13 @@
-
 import { SecretKey } from "../../Secure/SeckretKey";
 import { Console } from "../../Utils/Console";
 import { Fetch } from "../../Utils/Fetch";
 import { Token } from "../../Utils/Token";
 import { firefox, type Browser, type Locator, type Page } from '@playwright/test'
-import { SMSCode } from "../../Utils/SMSCode";
-
-
-
 
 interface ResponseService {
     status: boolean | null
     type?: Error
 }
-
 
 enum Error {
     CODESMS = "CODESMS",
@@ -30,17 +24,29 @@ enum Error {
     NONE = "NONE"
 }
 
-export class SberBankWithdraw {
+interface ResponseAmount {
+    token: string
+    id_card: number
+    uid_bank: string
+    status: number
+    sum: string
+    error: Error
+}
 
+export class SberBankAmount {
+
+    /*
+    *** All variables
+    */
     private browser: Browser | undefined;
     private url: string;
     private login: string;
     private pass: string;
-    private id: number;
-    private amount: number;
-    private number_card: string
-    private phone: string
+    private id_card: number;
+    private uid_bank: string
+    private number_card: string;
     private DOME_OPERATION: boolean = false;
+    private sum: string = ''
 
     /*
     *** Count errors
@@ -55,13 +61,12 @@ export class SberBankWithdraw {
     private Error_CODESMS: number = 0
     private Error_DELETESMS: number = 0
 
-    constructor(login: string, pass: string, id: number, amount: number, number_card: string, phone: string) {
+    constructor(login: string, pass: string, id_card: number, uid_bank: string, number_card: string) {
         this.login = login;
         this.pass = pass;
-        this.id = id
-        this.amount = amount
+        this.id_card = id_card
+        this.uid_bank = uid_bank
         this.number_card = number_card
-        this.phone = phone
         this.url = 'https://online.sberbank.ru/CSAFront/index.do';
     }
 
@@ -72,11 +77,13 @@ export class SberBankWithdraw {
 
         const token: string = await Token.sign({ session_uid: '' }, SecretKey.secret_key_micro, 60000);
 
-        const data = {
+        const data: ResponseAmount = {
             status: error ? 500 : 200,
             error: error ? error : Error.NONE,
-            id: this.id,
-            token: token
+            id_card: this.id_card,
+            uid_bank: this.uid_bank,
+            token: token,
+            sum: this.sum
         }
 
         console.log(data)
@@ -214,147 +221,50 @@ export class SberBankWithdraw {
 
             await this.delay(10000);
 
-            Console.log('[+] Search "Новый перевод"')
-            const new_translation: Locator[] = await page.getByText('Новый перевод').all();
+            Console.log('[+] Get Acard');
+            const acard: Locator[] = await page.locator(`a[title="МИР Сберкарта ${this.number_card.slice(this.number_card.length - 4)}"]`).all();
 
-            if (new_translation.length) await new_translation[0].click();
+            if (acard.length) await acard[0].click();
             else {
+                /*
+                *** Not found something elems
+                */
                 await this.browser.close()
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
             await this.delay(5000);
 
-            Console.log('[+] Search input[type="tel"]')
-            const number_card: Locator[] = await page.locator('input[type="tel"]').all();
+            Console.log('[+] Get payment account');
+            const payment_account: Locator[] = await page.locator('a[title="Платёжный счёт"]').all();
 
-            if (!number_card.length) {
+            if (payment_account.length == 0) {
+                /*
+                *** Not found something elems
+                */
                 await this.browser.close()
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
-            number_card[0].fill(this.number_card);
+            const amount: Locator[] = await payment_account[0].locator(`p`).all();
 
-            await this.delay(1000);
+            if (amount.length == 0) {
 
-            Console.log('[+] Search "Продолжить"')
-            const next_step: Locator[] = await page.getByText('Продолжить').all();
-
-            if (next_step.length) await next_step[0].click();
-            else {
+                /*
+                *** Not found something elems
+                */
                 await this.browser.close()
                 return { status: false, type: Error.NOTFOUNDELEM };
-            }
+                
+            } 
 
-            await this.delay(5000);
+            const sum: string = await amount[0].innerText();
 
-            Console.log('[+] Search "Продолжить v1"')
-            const next_step_v1: Locator[] = await page.locator('button[aria-label="Продолжить"]').all();
-
-            if (next_step_v1.length) await next_step_v1[0].click();
-            else {
-                await this.browser.close()
-                return { status: false, type: Error.NOTFOUNDELEM };
-            }
-
-            await this.delay(5000);
-
-
-            Console.log('[+] Delete all sms')
-            const deleteSMS: { status: boolean } = await SMSCode.deleteSMS(this.phone);
-
-            Console.log(`[+] Delete all sms ${deleteSMS.status}`)
-            if (deleteSMS.status == false) {
-                await this.browser.close()
-                return { status: false, type: Error.DELETESMS };
-            }
-
-            Console.log('[+] Search input[label="Сумма"]')
-            const amount: Locator[] = await page.locator('input[label="Сумма"]').all();
-
-            if (!amount.length) {
-                await this.browser.close()
-                return { status: false, type: Error.NOTFOUNDELEM };
-            }
-
-            amount[0].fill(this.amount.toString());
-
-            await this.delay(3000);
-
-            Console.log('[+] Search "Продолжить"')
-            const next_step_v2: Locator[] = await page.getByText('Продолжить').all();
-
-            if (next_step_v2.length) await next_step_v2[0].click();
-            else {
-                await this.browser.close()
-                return { status: false, type: Error.NOTFOUNDELEM };
-            }
-
-            await this.delay(3000);
-
-            let code_sms: string = ''
-
-            let count = 0;
-
-            while (true) {
-
-                await this.delay(5000);
-
-                Console.log('[+] Request get sms')
-                const code_sms_res: { status: boolean, data?: string } = await SMSCode.getSMS(this.phone);
-
-                Console.log(`[+] Response sms code ${code_sms_res.status}`)
-                if (count == 3) {
-                    await this.browser.close()
-                    return { status: false, type: Error.CODESMS };
-                }
-
-                if (code_sms_res.status && code_sms_res.data?.length) {
-
-                    code_sms = code_sms_res.data
-                    break
-                }
-
-                count++;
-            }
-
-            await this.delay(2000);
-
-            Console.log('[+] Search input[aria-label="Поле ввода кода из смс"]')
-            const code: Locator[] = await page.locator('input[aria-label="Поле ввода кода из смс"]').all();
-
-            if (!code.length) {
-                await this.browser.close()
-                return { status: false, type: Error.NOTFOUNDELEM };
-            }
-
-            if (code_sms.length) {
-                code[0].fill(code_sms);
-            } else {
-                await this.browser.close()
-                return { status: false, type: Error.CODESMS };
-            }
-
-            await this.delay(1000);
-
-            Console.log('[+] Search "Подтвердить"')
-            const done: Locator[] = await page.getByText('Подтвердить').all();
-
-            if (done.length) await done[0].click();
-            else {
-                await this.browser.close()
-                return { status: false, type: Error.NOTFOUNDELEM };
-            }
-
-            await this.delay(7000);
-
-            const transaction_ok: Locator[] = await page.getByText('Перевод доставлен').all();
-
-            await this.delay(1000);
+            this.sum = sum.split(',')[0]
 
             await this.browser.close()
 
-            return transaction_ok.length ? { status: true } : { status: false, type: Error.OTHER }
+            return sum.length ? {status: true} : { status: false, type: Error.OTHER }
 
         }
         catch (e) {
@@ -370,9 +280,9 @@ export class SberBankWithdraw {
     /*
     *** Start app and check errors
     */
-    public async withdraw(): Promise<void> {
+    public async amount(): Promise<void> {
 
-        let staper: boolean  = true 
+        let staper: boolean = true
 
         while (staper) {
 
@@ -492,5 +402,4 @@ export class SberBankWithdraw {
         }
 
     }
-
 }
