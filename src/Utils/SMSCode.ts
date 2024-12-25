@@ -31,11 +31,11 @@ interface requestSMSPortTtyData {
 interface requestSMSPortTty {
     status: boolean
     data: requestSMSPortTtyData[]
-} 
+}
 
 export class SMSCode {
 
-    
+
     /*
     *** Delete all sms for white list
     */
@@ -49,17 +49,17 @@ export class SMSCode {
 
             if (req.status) {
 
-                for (const i of req.data ) {
+                for (const i of req.data) {
 
                     if (i.phone === phone) {
 
-                        const req: {status: boolean} = await Fetch.request('http://localhost:3005/deleteallmessage', { token: token, port: i.tty});
+                        const req: { status: boolean } = await Fetch.request('http://localhost:3005/deleteallmessage', { token: token, port: i.tty });
 
-                        Console.log(`[+] Delete all message to number ${i.phone} Status: ${req.status}` )
-                        return {status: req.status }
+                        Console.log(`[+] Delete all message to number ${i.phone} Status: ${req.status}`)
+                        return { status: req.status }
 
                     }
-                    
+
                 }
             }
 
@@ -76,43 +76,56 @@ export class SMSCode {
     /*
     *** Get sms code for withdraw
     */
-    public static async getSMS(): Promise<requestSMSAnswer> {
+    public static async getSMS(phone: string): Promise<requestSMSAnswer> {
 
         try {
 
             const token: string = await Token.sign({ uid: 'uid' }, SecretKey.secret_key_micro, 1000);
 
-            const req: requestSMSRes = await Fetch.request('http://localhost:3005/getallmessages', { token: token });
+            const req: requestSMSPortTty = await Fetch.request('http://localhost:3005/getalltty', { token: token });
 
             if (req.status) {
 
-                if (req.data.length) {
-                    const num: string[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+                for (const i of req.data) {
 
-                    const code_sms: string[] = []
+                    if (i.phone === phone) {
 
-                    for (let i of req.data.reverse()) {
+                        const req: requestSMSRes = await Fetch.request('http://localhost:3005/getallmessages', { token: token, port: i.tty });
 
-                        const message: string = i.message.toLowerCase();
+                        if (req.status) {
 
-                        if (message.includes("код")) {
-                            const position = message.indexOf('код');
+                            if (req.data.length) {
+                                const num: string[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 
-                            for (let p = position; p < message.length; p++) {
+                                const code_sms: string[] = []
 
-                                if (num.includes('.')) {
-                                    break
+                                for (let i of req.data.reverse()) {
+
+                                    const message: string = i.message.toLowerCase();
+
+                                    if (message.includes("код")) {
+                                        const position = message.indexOf('код');
+
+                                        for (let p = position; p < message.length; p++) {
+
+                                            if (num.includes('.')) {
+                                                break
+                                            }
+
+                                            if (num.includes(message[p])) {
+                                                code_sms.push(message[p])
+                                            }
+                                        }
+
+                                    }
                                 }
 
-                                if (num.includes(message[p])) {
-                                    code_sms.push(message[p])
-                                }
+                                return { status: true, data: code_sms.join('') }
                             }
-
                         }
+
                     }
 
-                    return {status: true, data: code_sms.join('')}
                 }
             }
 
@@ -126,8 +139,7 @@ export class SMSCode {
         }
     }
 
-} 
+}
 
 
 
-(async () => await SMSCode.deleteSMS(''))();

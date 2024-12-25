@@ -16,6 +16,7 @@ interface ResponseService {
 
 
 enum Error {
+    CODESMS = "CODESMS",
     DELETESMS = "DELETESMS",
     PROXY = "PROXY",
     LOGIN = "LOGIN",
@@ -31,12 +32,11 @@ enum Error {
 
 export class SberBankWithdraw {
 
-
     private browser: Browser | undefined;
     private url: string;
     private login: string;
     private pass: string;
-    private id : number;
+    private id: number;
     private amount: number;
     private number_card: string
     private phone: string
@@ -58,7 +58,7 @@ export class SberBankWithdraw {
         this.id = id
         this.amount = amount
         this.number_card = number_card
-        this.phone= phone
+        this.phone = phone
         this.url = 'https://online.sberbank.ru/CSAFront/index.do';
     }
 
@@ -111,6 +111,21 @@ export class SberBankWithdraw {
     private async start(): Promise<ResponseService> {
 
         try {
+
+
+            // const deleteSMS: {status: boolean} = await SMSCode.deleteSMS(this.phone);
+
+            // console.log(deleteSMS)
+
+            // await this.delay(1000)
+
+
+            // const code_sms1: {status: boolean, data?: string} = await SMSCode.getSMS(this.phone);
+
+
+            // console.log(code_sms1)
+
+            // return {status: true}
 
             this.browser = await firefox.launch({ headless: false, executablePath: '' });
             const page: Page = await this.browser.newPage();
@@ -216,7 +231,7 @@ export class SberBankWithdraw {
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
-            await this.delay(3000);
+            await this.delay(5000);
 
             Console.log('[+] Search input[type="tel"]')
             const number_card: Locator[] = await page.locator('input[type="tel"]').all();
@@ -244,9 +259,6 @@ export class SberBankWithdraw {
             Console.log('[+] Search "Продолжить v1"')
             const next_step_v1: Locator[] = await page.locator('button[aria-label="Продолжить"]').all();
 
-            Console.warning(next_step_v1)
-            Console.warning(next_step_v1.length)
-
             if (next_step_v1.length) await next_step_v1[0].click();
             else {
                 await this.browser.close()
@@ -257,11 +269,10 @@ export class SberBankWithdraw {
 
 
             Console.log('[+] Delete all sms')
-            const deleteSMS: {status: boolean} = await SMSCode.deleteSMS(this.phone);
+            const deleteSMS: { status: boolean } = await SMSCode.deleteSMS(this.phone);
 
-
-            Console.log(`[+] Status sms code ${deleteSMS.status}`)
-            if (deleteSMS.status === false) {
+            Console.log(`[+] Delete all sms ${deleteSMS.status}`)
+            if (deleteSMS.status == false) {
                 await this.browser.close()
                 return { status: false, type: Error.DELETESMS };
             }
@@ -287,14 +298,35 @@ export class SberBankWithdraw {
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
-            await this.delay(4000);
+            await this.delay(3000);
 
-            // get code 
+            let code_sms: { data?: string } = {}
 
-            // aria-label="Поле ввода кода из смс"
+            let count = 0;
 
-            const code_sms: string = '12345'
+            while (true) {
 
+                await this.delay(5000);
+
+                Console.log('[+] Request get sms')
+                const code_sms_res: { status: boolean, data?: string } = await SMSCode.getSMS(this.phone);
+
+                Console.log(`[+] Response sms code ${code_sms_res.status}`)
+                if (count == 3) {
+                    await this.browser.close()
+                    return { status: false, type: Error.CODESMS };
+                }
+
+                if (code_sms_res.status) {
+
+                    code_sms = {data: code_sms_res.data}
+                    break
+                }
+
+                count++;
+            }
+
+            await this.delay(1000);
 
             Console.log('[+] Search input[aria-label="Поле ввода кода из смс"]')
             const code: Locator[] = await page.locator('input[aria-label="Поле ввода кода из смс"]').all();
@@ -304,7 +336,12 @@ export class SberBankWithdraw {
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
-            code[0].fill(code_sms);
+            if (code_sms.data) {
+                code[0].fill(code_sms.data);
+            } else {
+                await this.browser.close()
+                return { status: false, type: Error.CODESMS };
+            }
 
             await this.delay(1000);
 
@@ -317,11 +354,15 @@ export class SberBankWithdraw {
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
-            await this.delay(5000);
+            await this.delay(7000);
+
+            const transaction_ok: Locator[] = await page.getByText('Перевод доставлен').all();
+
+            await this.delay(1000);
 
             await this.browser.close()
 
-            return { status: false, type: Error.OTHER }
+            return transaction_ok.length ? { status: true } : { status: false, type: Error.OTHER }
 
         }
         catch (e) {
@@ -355,15 +396,35 @@ export class SberBankWithdraw {
             await this.delay(5000);
 
 
-            return
+
 
             if (start.status == false) {
+
+
+
+                Console.log(start.type)
+
+                return
                 /* 
                 *** Check errors
                 */
                 Console.error("[+] Status false")
 
                 switch (start.type) {
+
+                    case Error.CODESMS:
+                        Console.error('[+] Error.CODESMS')
+
+                        await this.response(Error.CODESMS)
+
+                        break
+
+                    case Error.DELETESMS:
+                        Console.error('[+] Error.DELETESMS')
+
+                        await this.response(Error.DELETESMS)
+
+                        break
 
                     case Error.OTHER:
                         Console.error('[+] Error.OTHER')
