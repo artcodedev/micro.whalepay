@@ -40,6 +40,7 @@ export class SberBankWithdraw {
     private amount: number;
     private number_card: string
     private phone: string
+    private DOME_OPERATION: boolean = false;
 
     /*
     *** Count errors
@@ -51,6 +52,8 @@ export class SberBankWithdraw {
     private Error_NOTFOUNDELEM: number = 0;
     private Error_PARSE: number = 0;
     private Error_SESSIONERROR: number = 0;
+    private Error_CODESMS: number = 0
+    private Error_DELETESMS: number = 0
 
     constructor(login: string, pass: string, id: number, amount: number, number_card: string, phone: string) {
         this.login = login;
@@ -77,6 +80,8 @@ export class SberBankWithdraw {
         }
 
         console.log(data)
+
+        this.DOME_OPERATION = true
 
         // await Fetch.request("http://localhost:5000/api/payment/trxmicroservice", data);
 
@@ -111,21 +116,6 @@ export class SberBankWithdraw {
     private async start(): Promise<ResponseService> {
 
         try {
-
-
-            // const deleteSMS: {status: boolean} = await SMSCode.deleteSMS(this.phone);
-
-            // console.log(deleteSMS)
-
-            // await this.delay(1000)
-
-
-            // const code_sms1: {status: boolean, data?: string} = await SMSCode.getSMS(this.phone);
-
-
-            // console.log(code_sms1)
-
-            // return {status: true}
 
             this.browser = await firefox.launch({ headless: false, executablePath: '' });
             const page: Page = await this.browser.newPage();
@@ -192,7 +182,8 @@ export class SberBankWithdraw {
                     /*
                     *** change proxy
                     */
-                    await this.delay(5000);
+                    await this.delay(3000);
+                    await this.browser.close()
                     Console.log('[+] Need change proxy (show capcha)')
                     return { status: false, type: Error.PROXY };
                 }
@@ -204,7 +195,8 @@ export class SberBankWithdraw {
                     *** fatal error
                     */
 
-                    await this.delay(5000);
+                    await this.delay(3000);
+                    await this.browser.close()
                     Console.log('[+] Fatal error (login incorect)')
                     return { status: false, type: Error.LOGIN };
                 }
@@ -300,7 +292,7 @@ export class SberBankWithdraw {
 
             await this.delay(3000);
 
-            let code_sms: { data?: string } = {}
+            let code_sms: string = ''
 
             let count = 0;
 
@@ -317,16 +309,16 @@ export class SberBankWithdraw {
                     return { status: false, type: Error.CODESMS };
                 }
 
-                if (code_sms_res.status) {
+                if (code_sms_res.status && code_sms_res.data?.length) {
 
-                    code_sms = {data: code_sms_res.data}
+                    code_sms = code_sms_res.data
                     break
                 }
 
                 count++;
             }
 
-            await this.delay(1000);
+            await this.delay(2000);
 
             Console.log('[+] Search input[aria-label="Поле ввода кода из смс"]')
             const code: Locator[] = await page.locator('input[aria-label="Поле ввода кода из смс"]').all();
@@ -336,8 +328,8 @@ export class SberBankWithdraw {
                 return { status: false, type: Error.NOTFOUNDELEM };
             }
 
-            if (code_sms.data) {
-                code[0].fill(code_sms.data);
+            if (code_sms.length) {
+                code[0].fill(code_sms);
             } else {
                 await this.browser.close()
                 return { status: false, type: Error.CODESMS };
@@ -380,7 +372,14 @@ export class SberBankWithdraw {
     */
     public async payment(): Promise<void> {
 
-        while (true) {
+        let staper: boolean  = true 
+
+        while (staper) {
+
+            if (this.DOME_OPERATION) {
+                staper = false
+                return
+            }
 
             const start: ResponseService = await this.start();
 
@@ -388,23 +387,15 @@ export class SberBankWithdraw {
 
                 await this.response(null)
 
+                staper = false
+
                 return
 
             }
 
 
-            await this.delay(5000);
-
-
-
-
             if (start.status == false) {
 
-
-
-                Console.log(start.type)
-
-                return
                 /* 
                 *** Check errors
                 */
@@ -415,22 +406,32 @@ export class SberBankWithdraw {
                     case Error.CODESMS:
                         Console.error('[+] Error.CODESMS')
 
-                        await this.response(Error.CODESMS)
+
+                        if (this.Error_CODESMS > 2) {
+                            await this.response(Error.CODESMS);
+                            staper = false
+                        }
+
+                        this.Error_CODESMS++
 
                         break
 
                     case Error.DELETESMS:
-                        Console.error('[+] Error.DELETESMS')
+                        Console.error('[+] Error.DELETESMS');
 
-                        await this.response(Error.DELETESMS)
+                        if (this.Error_DELETESMS > 2) {
+                            await this.response(Error.DELETESMS);
+                            staper = false
+                        }
 
-                        break
+                        this.Error_DELETESMS++
 
                     case Error.OTHER:
                         Console.error('[+] Error.OTHER')
 
                         if (this.Error_OTHER > 2) {
-                            await this.response(Error.OTHER)
+                            await this.response(Error.OTHER);
+                            staper = false
                         }
                         this.Error_OTHER++;
                         break
@@ -440,6 +441,7 @@ export class SberBankWithdraw {
 
                         if (this.Error_LOGIN > 3) {
                             await this.response(Error.LOGIN);
+                            staper = false
                         }
                         this.Error_LOGIN++;
                         break
@@ -448,6 +450,7 @@ export class SberBankWithdraw {
                         Console.error('[+] Error.NETWORK')
                         if (this.Error_NETWORK > 2) {
                             await this.response(Error.NETWORK);
+                            staper = false
                         }
                         this.Error_NETWORK++;
                         break
@@ -456,6 +459,7 @@ export class SberBankWithdraw {
                         Console.error('[+] Error.NOTFOUNDELEM')
                         if (this.Error_NOTFOUNDELEM > 2) {
                             await this.response(Error.NOTFOUNDELEM);
+                            staper = false
                         }
                         this.Error_NOTFOUNDELEM++;
                         break
@@ -464,6 +468,7 @@ export class SberBankWithdraw {
                         Console.error('[+] Error.PARSE')
                         if (this.Error_PARSE > 2) {
                             await this.response(Error.PARSE);
+                            staper = false
                         }
                         this.Error_PARSE++;
                         break
@@ -477,6 +482,7 @@ export class SberBankWithdraw {
                         Console.error('[+] Error.SESSIONERROR')
                         if (this.Error_SESSIONERROR > 2) {
                             await this.response(Error.SESSIONERROR);
+                            staper = false
                         }
                         this.Error_SESSIONERROR++;
                         break

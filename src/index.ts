@@ -119,7 +119,9 @@ app.post('/micro/withdraw/sberbank_rub', async (c) => {
 
       const cber = new SberBankWithdraw(req.login, req.pass, req.id, req.amount, req.number_card, req.phone);
 
-      await cber.payment();
+      cber.payment();
+
+      return c.json({ status: 200, message: "request accepted" });
 
     }
 
