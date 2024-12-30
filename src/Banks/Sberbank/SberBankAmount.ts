@@ -29,8 +29,7 @@ interface ResponseAmount {
     id_card: number
     uid_bank: string
     status: number
-    sum: string
-    error: Error
+    sum: number
 }
 
 export class SberBankAmount {
@@ -46,7 +45,7 @@ export class SberBankAmount {
     private uid_bank: string
     private number_card: string;
     private DOME_OPERATION: boolean = false;
-    private sum: string = ''
+    private sum: number = 0;
 
     /*
     *** Count errors
@@ -79,7 +78,6 @@ export class SberBankAmount {
 
         const data: ResponseAmount = {
             status: error ? 500 : 200,
-            error: error ? error : Error.NONE,
             id_card: this.id_card,
             uid_bank: this.uid_bank,
             token: token,
@@ -90,7 +88,9 @@ export class SberBankAmount {
 
         this.DOME_OPERATION = true
 
-        // await Fetch.request("http://localhost:5000/api/payment/trxmicroservice", data);
+        const res = await Fetch.request("http://localhost:5000/api/micro/updateamount", data);
+
+        console.log(res)
 
     }
 
@@ -101,6 +101,22 @@ export class SberBankAmount {
         return new Promise(function (resolve) {
             setTimeout(resolve, time)
         });
+    }
+
+    /*
+    *** Get amount in string
+    */
+    private async getAmount(sum: string): Promise<number> {
+
+        const num: string[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+
+        const amount: string[] = []
+
+        for (let i of sum) {
+            if (num.includes(i)) amount.push(i)
+        }
+
+        return Number.parseInt(amount.join(''))
     }
 
     /*
@@ -260,7 +276,7 @@ export class SberBankAmount {
 
             const sum: string = await amount[0].innerText();
 
-            this.sum = sum.split(',')[0]
+            this.sum = await this.getAmount(sum.split(',')[0]);
 
             await this.browser.close()
 

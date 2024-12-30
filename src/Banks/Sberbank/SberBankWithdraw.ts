@@ -259,7 +259,6 @@ export class SberBankWithdraw {
 
             await this.delay(5000);
 
-
             Console.log('[+] Delete all sms')
             const deleteSMS: { status: boolean } = await SMSCode.deleteSMS(this.phone);
 
@@ -392,7 +391,6 @@ export class SberBankWithdraw {
                 return
 
             }
-
 
             if (start.status == false) {
 

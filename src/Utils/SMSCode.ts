@@ -45,7 +45,7 @@ export class SMSCode {
 
             const token: string = await Token.sign({ uid: 'uid' }, SecretKey.secret_key_micro, 1000);
 
-            const req: requestSMSPortTty = await Fetch.request('http://localhost:3005/getalltty', { token: token });
+            const req: requestSMSPortTty = await Fetch.request('http://localhost:3020/getalltty', { token: token });
 
             if (req.status) {
 
@@ -53,7 +53,7 @@ export class SMSCode {
 
                     if (i.phone === phone) {
 
-                        const req: { status: boolean } = await Fetch.request('http://localhost:3005/deleteallmessage', { token: token, port: i.tty });
+                        const req: { status: boolean } = await Fetch.request('http://localhost:3020/deleteallmessage', { token: token, port: i.tty });
 
                         Console.log(`[+] Delete all message to number ${i.phone} Status: ${req.status}`)
                         return { status: req.status }
@@ -82,7 +82,9 @@ export class SMSCode {
 
             const token: string = await Token.sign({ uid: 'uid' }, SecretKey.secret_key_micro, 1000);
 
-            const req: requestSMSPortTty = await Fetch.request('http://localhost:3005/getalltty', { token: token });
+            const req: requestSMSPortTty = await Fetch.request('http://localhost:3020/getalltty', { token: token });
+
+            console.log(req)
 
             if (req.status) {
 
@@ -90,7 +92,7 @@ export class SMSCode {
 
                     if (i.phone === phone) {
 
-                        const req: requestSMSRes = await Fetch.request('http://localhost:3005/getallmessages', { token: token, port: i.tty });
+                        const req: requestSMSRes = await Fetch.request('http://localhost:3020/getallmessages', { token: token, port: i.tty });
 
                         if (req.status) {
 
