@@ -83,7 +83,7 @@ export class SberBankWithdraw {
 
         this.DOME_OPERATION = true
 
-        // await Fetch.request("http://localhost:5000/api/payment/trxmicroservice", data);
+        await Fetch.request("http://localhost:5000/api/micro/withdraw", data);
 
     }
 
@@ -360,9 +360,8 @@ export class SberBankWithdraw {
 
             await this.close()
 
+            return { status: false, type: Error.OTHER }
         }
-
-        return { status: false, type: Error.OTHER }
 
     }
 

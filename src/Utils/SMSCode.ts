@@ -94,6 +94,8 @@ export class SMSCode {
 
                         const req: requestSMSRes = await Fetch.request('http://localhost:3020/getallmessages', { token: token, port: i.tty });
 
+                        console.log(req)
+
                         if (req.status) {
 
                             if (req.data.length) {
